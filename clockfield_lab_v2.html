@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clockfield Lab v2 — dΓ/dβ = −2τΓ^(3/2)</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
+
+:root {
+  --void:    #04060a;
+  --panel:   #080c14;
+  --border:  #0f1a28;
+  --edge:    #00e5c8;
+  --fire:    #ff5500;
+  --ice:     #1a4060;
+  --gold:    #ffd166;
+  --warn:    #ff3344;
+  --text:    #8aa8c8;
+  --bright:  #d8eaf8;
+  --dim:     #2a3a50;
+  --xi-tau:  #ff6644;    /* Xi/tau candidate colour */
+  --sqrt-xi: #ffd166;    /* sqrt(Xi/tau) candidate colour */
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  background: var(--void);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ── canvas area ─────────────────────────────────────────── */
+#sim-area {
+  flex: 1;
+  position: relative;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+canvas {
+  image-rendering: pixelated;
+  cursor: crosshair;
+  display: block;
+}
+
+#hud {
+  position: absolute;
+  top: 10px; left: 10px;
+  font-size: 10px;
+  line-height: 1.8;
+  pointer-events: none;
+  color: var(--dim);
+}
+#hud .v   { color: var(--edge); }
+#hud .hot { color: var(--fire); }
+#hud .eq  { color: var(--gold); font-weight: 600; }
+
+/* sigma readout bar at bottom of canvas */
+#sigma-bar {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 28px;
+  background: rgba(4,6,10,0.85);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 10px;
+  font-size: 9px;
+  pointer-events: none;
+}
+#sigma-track {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  position: relative;
+  overflow: visible;
+}
+.sigma-marker {
+  position: absolute;
+  top: -4px;
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+}
+#sigma-cursor {
+  position: absolute;
+  top: -5px;
+  width: 3px;
+  height: 14px;
+  background: white;
+  border-radius: 1px;
+  transition: left 0.08s;
+}
+
+/* ── right panel ─────────────────────────────────────────── */
+#panel {
+  width: 300px;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.p-head {
+  padding: 14px 16px 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+  margin-bottom: 0;
+}
+h1 {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--bright);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.tagline {
+  font-size: 8px;
+  color: var(--dim);
+  letter-spacing: 0.5px;
+  margin-top: 3px;
+  line-height: 1.5;
+}
+.tagline b { color: var(--edge); }
+
+.sec {
+  padding: 8px 16px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.sec-title {
+  font-size: 8px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 8px;
+}
+
+/* theory box */
+.theory-box {
+  background: #050910;
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  font-size: 8px;
+  line-height: 1.8;
+  color: var(--dim);
+  margin-bottom: 4px;
+}
+.theory-box .eq { color: var(--edge); font-size: 9px; }
+.theory-box .hi { color: var(--gold); }
+
+/* sliders */
+.ctrl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+.ctrl label {
+  font-size: 8px;
+  color: var(--dim);
+  width: 82px;
+  flex-shrink: 0;
+}
+.ctrl input[type=range] {
+  flex: 1;
+  accent-color: var(--edge);
+  height: 2px;
+}
+.ctrl .v {
+  font-size: 9px;
+  color: var(--edge);
+  width: 44px;
+  text-align: right;
+}
+
+/* toggle switches */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.toggle-row label { font-size: 8px; color: var(--dim); flex: 1; }
+.toggle {
+  width: 32px; height: 16px;
+  background: var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle.on { background: var(--edge); }
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 12px; height: 12px;
+  background: white;
+  border-radius: 50%;
+  transition: left 0.2s;
+}
+.toggle.on::after { left: 18px; }
+
+/* buttons */
+.btn-row { display: flex; gap: 5px; margin-bottom: 5px; }
+.btn {
+  flex: 1;
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: all 0.12s;
+}
+.btn:hover { border-color: var(--edge); color: var(--edge); }
+.btn.on { background: rgba(0,229,200,0.08); border-color: var(--edge); color: var(--edge); }
+.btn.fire-btn { border-color: rgba(255,85,0,0.3); color: var(--fire); }
+.btn.fire-btn:hover { background: rgba(255,85,0,0.06); }
+.btn.danger { border-color: rgba(255,51,68,0.3); color: var(--warn); }
+.btn.danger:hover { background: rgba(255,51,68,0.06); }
+
+/* meters */
+.meter { display:flex; align-items:center; gap:6px; margin-bottom:4px; }
+.meter-label { font-size:8px; color:var(--dim); width:52px; flex-shrink:0; }
+.meter-bar { flex:1; height:2px; background:var(--border); border-radius:1px; overflow:hidden; }
+.meter-fill { height:100%; border-radius:1px; }
+.meter-val { font-size:8px; color:var(--text); width:46px; text-align:right; flex-shrink:0; }
+
+/* soc readout */
+#soc-box {
+  background: #050910;
+  border: 1px solid var(--dim);
+  padding: 8px 10px;
+  font-size: 8px;
+  line-height: 2;
+  transition: border-color 0.3s;
+}
+#soc-box.active { border-color: var(--edge); }
+
+/* viz tabs */
+.viz-tabs { display:flex; gap:3px; flex-wrap:wrap; }
+.viz-tabs .btn { flex:none; padding:4px 7px; font-size:7px; }
+
+.help {
+  font-size: 8px;
+  color: var(--dim);
+  line-height: 1.7;
+  padding: 10px 16px;
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+}
+.help b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<div id="sim-area">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div>step <span class="v" id="h-step">0</span>  fps <span class="v" id="h-fps">0</span></div>
+    <div>max β <span class="v" id="h-maxb">0.00</span>  min Γ <span class="v" id="h-ming">1.000</span></div>
+    <div>frozen <span class="hot" id="h-frozen">0.0%</span>  energy <span class="v" id="h-energy">0</span></div>
+    <div>σ_dyn <span class="eq" id="h-sigma">—</span>  SOC <span class="v" id="h-soc-state">OFF</span></div>
+  </div>
+
+  <!-- sigma measurement bar -->
+  <div id="sigma-bar">
+    <span style="color:var(--dim);font-size:8px;white-space:nowrap">σ measurement</span>
+    <div id="sigma-track">
+      <!-- Xi/tau marker -->
+      <div class="sigma-marker" id="sm-xi"
+           style="background:var(--xi-tau)"
+           title="Ξ/τ = 0.4651"></div>
+      <!-- sqrt(Xi/tau) marker -->
+      <div class="sigma-marker" id="sm-sqrt"
+           style="background:var(--sqrt-xi)"
+           title="√(Ξ/τ) = 0.6820"></div>
+      <!-- live cursor -->
+      <div id="sigma-cursor"></div>
+    </div>
+    <span id="sb-xi"  style="color:var(--xi-tau);font-size:8px">Ξ/τ=0.465</span>
+    <span id="sb-sqrt" style="color:var(--sqrt-xi);font-size:8px">√=0.682</span>
+    <span id="sb-live" style="color:white;font-size:8px;font-weight:600">σ=—</span>
+  </div>
+</div>
+
+<!-- ── RIGHT PANEL ─────────────────────────────────────── -->
+<div id="panel">
+
+  <div class="p-head">
+    <h1>Clockfield Lab v2</h1>
+    <div class="tagline">
+      <b>dΓ/dβ = −2τΓ^(3/2)</b>  ·  energy slows time<br>
+      τ_BPS = 2.737  ·  Ξ/τ = 0.4651  ·  √(Ξ/τ) = 0.6820
+    </div>
+  </div>
+
+  <!-- Theory box -->
+  <div class="sec">
+    <div class="theory-box">
+      <span class="eq">Γ(β) = 1/(1+τβ)²</span><br>
+      <span class="eq">dΓ/dβ = −2τ·Γ^(3/2)</span>  <span style="color:#334">[first-order ODE]</span><br>
+      noise = <span class="hi">σ_dyn·√Γ</span> + <span style="color:#88aaff">σ_floor·(1−Γ)</span><br>
+      <span style="color:#334">freeze: β ≥ Ξ/τ · soft ceiling at 3×Ξ/τ</span>
+    </div>
+  </div>
+
+  <!-- Physics params -->
+  <div class="sec">
+    <div class="sec-title">Physics</div>
+    <div class="ctrl">
+      <label>τ coupling</label>
+      <input type="range" id="s-tau" min="0.5" max="8" step="0.01" value="2.737">
+      <span class="v" id="v-tau">2.737</span>
+    </div>
+    <div class="ctrl">
+      <label>σ dynamic</label>
+      <input type="range" id="s-sigma" min="0.01" max="2" step="0.01" value="0.40">
+      <span class="v" id="v-sigma">0.400</span>
+    </div>
+    <div class="ctrl">
+      <label>σ floor</label>
+      <input type="range" id="s-floor" min="0" max="0.2" step="0.005" value="0.04">
+      <span class="v" id="v-floor">0.040</span>
+    </div>
+    <div class="ctrl">
+      <label>damping</label>
+      <input type="range" id="s-damp" min="0" max="0.05" step="0.001" value="0.005">
+      <span class="v" id="v-damp">0.005</span>
+    </div>
+    <div class="ctrl">
+      <label>speed</label>
+      <input type="range" id="s-speed" min="1" max="10" step="1" value="3">
+      <span class="v" id="v-speed">3</span>
+    </div>
+  </div>
+
+  <!-- SOC thermostat -->
+  <div class="sec">
+    <div class="sec-title">SOC Thermostat</div>
+    <div class="toggle-row">
+      <label>Enable SOC (auto-tune σ)</label>
+      <div class="toggle" id="tog-soc"></div>
+    </div>
+    <div class="ctrl">
+      <label>feedback rate</label>
+      <input type="range" id="s-fbk" min="0.0005" max="0.02" step="0.0005" value="0.003">
+      <span class="v" id="v-fbk">0.003</span>
+    </div>
+    <div class="ctrl">
+      <label>target frozen</label>
+      <input type="range" id="s-target" min="0.1" max="0.9" step="0.05" value="0.50">
+      <span class="v" id="v-target">50%</span>
+    </div>
+    <div id="soc-box">
+      <span style="color:var(--dim)">σ_eq    </span><span id="soc-seq" style="color:var(--edge)">—</span><br>
+      <span style="color:var(--xi-tau)">Ξ/τ     </span><span style="color:var(--xi-tau)">0.4651</span>
+        <span id="soc-d1" style="color:var(--dim)"></span><br>
+      <span style="color:var(--sqrt-xi)">√(Ξ/τ)  </span><span style="color:var(--sqrt-xi)">0.6820</span>
+        <span id="soc-d2" style="color:var(--dim)"></span><br>
+      <span id="soc-verdict" style="color:var(--dim)">waiting for equilibrium…</span>
+    </div>
+  </div>
+
+  <!-- Inject -->
+  <div class="sec">
+    <div class="sec-title">Inject</div>
+    <div class="btn-row">
+      <button class="btn" id="inj-vortex">Vortex n=+1</button>
+      <button class="btn" id="inj-anti">Antivortex n=−1</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="inj-dipole">Dipole H⁰</button>
+      <button class="btn" id="inj-fermion">Fermion H⁻</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="inj-wave">Plane Wave</button>
+      <button class="btn fire-btn" id="inj-pulse">Energy Pulse</button>
+    </div>
+  </div>
+
+  <!-- Visualization -->
+  <div class="sec">
+    <div class="sec-title">Visualization</div>
+    <div class="viz-tabs">
+      <button class="btn on" data-viz="phase">Phase</button>
+      <button class="btn" data-viz="fire">Fire/Ice</button>
+      <button class="btn" data-viz="gamma">Γ field</button>
+      <button class="btn" data-viz="beta">β energy</button>
+      <button class="btn" data-viz="momentum">Momentum</button>
+    </div>
+  </div>
+
+  <!-- Boundaries -->
+  <div class="sec">
+    <div class="sec-title">Boundaries</div>
+    <div class="btn-row">
+      <button class="btn on" id="bc-dirichlet">Dirichlet</button>
+      <button class="btn" id="bc-periodic">Periodic</button>
+      <button class="btn" id="bc-absorb">Absorbing</button>
+    </div>
+  </div>
+
+  <!-- Diagnostics -->
+  <div class="sec">
+    <div class="sec-title">Diagnostics</div>
+    <div class="meter">
+      <span class="meter-label">frozen</span>
+      <div class="meter-bar"><div class="meter-fill" id="mf-frozen" style="background:var(--fire)"></div></div>
+      <span class="meter-val" id="mv-frozen">0.0%</span>
+    </div>
+    <div class="meter">
+      <span class="meter-label">min Γ</span>
+      <div class="meter-bar"><div class="meter-fill" id="mf-gamma" style="background:var(--edge);width:100%"></div></div>
+      <span class="meter-val" id="mv-gamma">1.000</span>
+    </div>
+    <div class="meter">
+      <span class="meter-label">max β</span>
+      <div class="meter-bar"><div class="meter-fill" id="mf-beta" style="background:var(--gold)"></div></div>
+      <span class="meter-val" id="mv-beta">0.00</span>
+    </div>
+    <div class="meter">
+      <span class="meter-label">energy</span>
+      <div class="meter-bar"><div class="meter-fill" id="mf-energy" style="background:#5588cc"></div></div>
+      <span class="meter-val" id="mv-energy">0</span>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="sec">
+    <div class="btn-row">
+      <button class="btn" id="btn-pause">⏸ Pause</button>
+      <button class="btn" id="btn-reset">Reset</button>
+      <button class="btn fire-btn" id="btn-genesis">Genesis</button>
+    </div>
+  </div>
+
+  <div class="help">
+    <b>Click</b> inject selected structure<br>
+    <b>Shift+drag</b> thaw (destructive probe)<br>
+    <b>Ctrl+drag</b> energy spike (freeze)<br>
+    <b>Fire/Ice</b>: orange=thawed · blue=frozen · cyan=edge<br>
+    <b>SOC ON</b>: σ auto-tunes toward balance<br>
+    watch σ_eq approach Ξ/τ or √(Ξ/τ)
+  </div>
+
+</div><!-- end panel -->
+
+<script>
+// ================================================================
+// CLOCKFIELD LAB v2
+// Upgraded to use the first-order ODE system:
+//   dΓ/dβ = -2τΓ^(3/2)   (exact, proved April 2026)
+//   Γ(β)  = 1/(1+τβ)²    (unique solution with Γ(0)=1, dΓ/dβ<0)
+//
+// Key changes from v1:
+//  1. Removed Mexican hat potential (unstable) → soft confinement
+//  2. Two-component noise: σ_dyn·√Γ + σ_floor·(1-Γ)
+//     σ_dyn drives new freezes in thawed regions
+//     σ_floor allows thaw events in frozen cores
+//  3. SOC thermostat: auto-tunes σ_dyn to find equilibrium
+//  4. Live σ measurement bar vs Ξ/τ and √(Ξ/τ) candidates
+//  5. New "Fire/Ice" visualization
+//  6. τ defaults to BPS value 2.737339
+// ================================================================
+
+const N   = 256;
+const DT  = 0.18;
+
+// Physical constants
+const TAU_BPS = 2.737339;
+const XI      = 4.0 / Math.PI;
+
+function XI_TAU(tau) { return XI / tau; }
+function SQRT_XI_TAU(tau) { return Math.sqrt(XI / tau); }
+function BETA_SOFT(tau) { return 3.0 * XI_TAU(tau); }
+const K_CONF = 5.0;
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  const wrap = document.getElementById('sim-area');
+  const W = wrap.clientWidth, H = wrap.clientHeight - 28; // 28 for sigma bar
+  const sz = Math.min(W, H);
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width  = N;
+  canvas.height = N;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+const img = ctx.createImageData(N, N);
+
+// Field arrays
+let ur = new Float32Array(N*N);
+let ui = new Float32Array(N*N);
+let ur_old = new Float32Array(N*N);
+let ui_old = new Float32Array(N*N);
+let bcMask = new Float32Array(N*N);
+
+// Simulation state
+let P = {
+  tau:       TAU_BPS,
+  sigma_dyn: 0.40,
+  sigma_floor: 0.04,
+  damp:      0.005,
+  speed:     3,
+  bc:        'dirichlet',
+  viz:       'phase',
+  soc:       false,
+  fbk:       0.003,
+  target:    0.50,
+};
+
+let simStep = 0, paused = false, injMode = 'vortex+1';
+
+// SOC history for equilibrium detection
+const SOC_HIST  = 200;   // steps of history kept
+let sigmaHistory = [];
+let socActive = false;
+
+// ── BOUNDARY MASK ────────────────────────────────────────────────
+function buildMask() {
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const i = y*N+x;
+      if (P.bc === 'dirichlet') {
+        const cx=x-N/2, cy=y-N/2, r=Math.sqrt(cx*cx+cy*cy), R=N/2-4;
+        bcMask[i] = r < R ? 1.0 : Math.max(0, 1-(r-R)/4);
+      } else if (P.bc === 'absorb') {
+        const d = Math.min(x,y,N-1-x,N-1-y);
+        bcMask[i] = d < 12 ? d/12 : 1.0;
+      } else {
+        bcMask[i] = 1.0;
+      }
+    }
+  }
+}
+buildMask();
+
+// ── INIT ─────────────────────────────────────────────────────────
+function initField(genesis=false) {
+  if (genesis) {
+    // Genesis: one hot seed at center, cold vacuum around it
+    for (let i = 0; i < N*N; i++) {
+      ur[i] = (Math.random()-0.5)*0.04 * bcMask[i];
+      ui[i] = (Math.random()-0.5)*0.04 * bcMask[i];
+      ur_old[i]=ur[i]; ui_old[i]=ui[i];
+    }
+    const cx=N/2, cy=N/2;
+    for (let dy=-10; dy<=10; dy++) for (let dx=-10; dx<=10; dx++) {
+      const r=Math.sqrt(dx*dx+dy*dy), ph=Math.atan2(dy,dx);
+      const amp=5.0*Math.exp(-r*r/12);
+      const i=(cy+dy)*N+(cx+dx);
+      if(i>=0&&i<N*N){ur[i]+=amp*Math.cos(ph)*bcMask[i]; ui[i]+=amp*Math.sin(ph)*bcMask[i]; ur_old[i]=ur[i]; ui_old[i]=ui[i];}
+    }
+  } else {
+    // Standard: random low-amplitude vacuum
+    for (let i = 0; i < N*N; i++) {
+      const ph = Math.random()*2*Math.PI;
+      const a  = 0.03 + Math.random()*0.02;
+      ur[i] = a*Math.cos(ph)*bcMask[i];
+      ui[i] = a*Math.sin(ph)*bcMask[i];
+      ur_old[i]=ur[i]; ui_old[i]=ui[i];
+    }
+  }
+  simStep = 0;
+  sigmaHistory = [];
+}
+buildMask();
+initField();
+
+// ── VORTEX INJECTION ─────────────────────────────────────────────
+function injectVortex(cx, cy, n, amp=2.0, w=3.5) {
+  for (let dy=-25; dy<=25; dy++) for (let dx=-25; dx<=25; dx++) {
+    const x=cx+dx, y=cy+dy;
+    if(x<0||x>=N||y<0||y>=N) continue;
+    const r=Math.sqrt(dx*dx+dy*dy);
+    const th=n*Math.atan2(dy,dx);
+    const A=amp*Math.tanh(r/w)*Math.exp(-r*r/400);
+    const i=y*N+x;
+    ur[i]+=A*Math.cos(th)*bcMask[i]; ui[i]+=A*Math.sin(th)*bcMask[i];
+    ur_old[i]=ur[i]; ui_old[i]=ui[i];
+  }
+}
+function injectDipole(cx,cy) { injectVortex(cx-10,cy,+1,1.8); injectVortex(cx+10,cy,-1,1.8); }
+function injectFermion(cx,cy) { injectVortex(cx-12,cy,-1,2.0); injectVortex(cx+12,cy,-1,2.0); }
+function injectWave(cx,cy) {
+  const k=0.28, amp=0.9;
+  for(let y=0;y<N;y++) for(let x=0;x<N;x++) {
+    const d=Math.abs(y-cy); if(d>28) continue;
+    const env=Math.exp(-d*d/280), i=y*N+x;
+    ur[i]+=amp*env*Math.cos(k*(x-cx))*bcMask[i];
+    ui[i]+=amp*env*Math.sin(k*(x-cx))*bcMask[i];
+    ur_old[i]=ur[i]; ui_old[i]=ui[i];
+  }
+}
+function injectPulse(cx,cy,strength=5.0) {
+  for(let dy=-18;dy<=18;dy++) for(let dx=-18;dx<=18;dx++) {
+    const x=cx+dx,y=cy+dy;
+    if(x<0||x>=N||y<0||y>=N) continue;
+    const A=strength*Math.exp(-(dx*dx+dy*dy)/40);
+    const i=y*N+x;
+    ur[i]+=A*bcMask[i]; ui[i]+=A*bcMask[i];
+    ur_old[i]=ur[i]; ui_old[i]=ui[i];
+  }
+}
+
+// ── PHYSICS ──────────────────────────────────────────────────────
+// Core: the first-order Clockfield equation
+//   Γ(β) = 1/(1+τβ)²   [unique solution to dΓ/dβ = -2τΓ^(3/2) with Γ(0)=1]
+//
+// PDE: d²φ/dt² = Γ²(β)·∇²φ + soft_confine(β)·φ + noise
+//   noise = σ_dyn·√Γ·ξ₁ + σ_floor·(1−Γ)·ξ₂
+//   soft_confine = -K·max(β - β_soft, 0)   [prevents runaway above 3×Ξ/τ]
+
+function idx(x,y) {
+  if(P.bc==='periodic') return ((y+N)%N)*N+((x+N)%N);
+  return Math.max(0,Math.min(N-1,y))*N+Math.max(0,Math.min(N-1,x));
+}
+
+let frozenFrac=0, maxBetaGlobal=0, minGammaGlobal=1, totalEnergyGlobal=0;
+
+function physicsStep() {
+  const {tau, sigma_dyn, sigma_floor, damp} = P;
+  const dt2 = DT*DT;
+  const xiTau   = XI_TAU(tau);
+  const betaSoft = BETA_SOFT(tau);
+  const nr = new Float32Array(N*N);
+  const ni = new Float32Array(N*N);
+
+  let maxBeta=0, minGamma=1, frozenN=0, totalE=0;
+
+  for (let y=1; y<N-1; y++) {
+    for (let x=1; x<N-1; x++) {
+      const i = y*N+x;
+      const m = bcMask[i];
+      if (m < 0.001) { nr[i]=0; ni[i]=0; continue; }
+
+      const beta = ur[i]*ur[i] + ui[i]*ui[i];
+      const tb   = tau*beta;
+      const G    = 1.0/((1+tb)*(1+tb));   // Γ
+      const G2   = G*G;                    // Γ² (kinetic suppression)
+      const sqG  = Math.sqrt(G);
+
+      // ── Laplacian (5-point) ──────────────────────────────────
+      const il=idx(x-1,y), ir=idx(x+1,y), iu=idx(x,y-1), id=idx(x,y+1);
+      const lapR = ur[il]+ur[ir]+ur[iu]+ur[id] - 4*ur[i];
+      const lapI = ui[il]+ui[ir]+ui[iu]+ui[id] - 4*ui[i];
+
+      // ── Soft confinement (replaces Mexican hat) ──────────────
+      // Prevents beta from growing beyond 3×Ξ/τ (stops runaway)
+      const excess  = Math.max(beta - betaSoft, 0);
+      const confine = -K_CONF * excess;
+
+      // ── Two-component noise ──────────────────────────────────
+      // σ_dyn·√Γ : full noise in thawed vacuum, suppressed near freeze
+      // σ_floor·(1-Γ) : small floor noise in frozen cores → enables thaw
+      const nAmp = sigma_dyn*sqG + sigma_floor*(1-G);
+      const nR = nAmp*(Math.random()-0.5)*2.0;
+      const nI = nAmp*(Math.random()-0.5)*2.0;
+
+      // ── Force: Γ²·(∇²φ + confine·φ) + noise ────────────────
+      const fR = G2*lapR + confine*ur[i] + nR;
+      const fI = G2*lapI + confine*ui[i] + nI;
+
+      // ── Verlet integration ───────────────────────────────────
+      const velR = (ur[i]-ur_old[i])*(1-damp);
+      const velI = (ui[i]-ui_old[i])*(1-damp);
+      nr[i] = (ur[i]+velR+dt2*fR)*m;
+      ni[i] = (ui[i]+velI+dt2*fI)*m;
+
+      // ── Amplitude clamp (anti-explosion) ────────────────────
+      const mag2 = nr[i]*nr[i]+ni[i]*ni[i];
+      if (mag2 > 9.0) { // clamp at |φ|=3
+        const sc = 3.0/Math.sqrt(mag2);
+        nr[i]*=sc; ni[i]*=sc;
+      }
+
+      // diagnostics
+      if(beta>maxBeta) maxBeta=beta;
+      if(G<minGamma) minGamma=G;
+      if(G<0.10) frozenN++;
+      totalE+=beta;
+    }
+  }
+
+  ur_old.set(ur); ui_old.set(ui);
+  ur.set(nr); ui.set(ni);
+  simStep++;
+
+  frozenFrac = frozenN/(N*N);
+  maxBetaGlobal = maxBeta;
+  minGammaGlobal = minGamma;
+  totalEnergyGlobal = totalE;
+
+  // ── SOC thermostat ───────────────────────────────────────────
+  if (P.soc) {
+    if (frozenFrac > P.target) P.sigma_dyn *= (1 - P.fbk);
+    else                       P.sigma_dyn *= (1 + P.fbk);
+    P.sigma_dyn = Math.max(0.005, Math.min(5.0, P.sigma_dyn));
+    document.getElementById('s-sigma').value = P.sigma_dyn.toFixed(3);
+    document.getElementById('v-sigma').textContent = P.sigma_dyn.toFixed(3);
+
+    sigmaHistory.push(P.sigma_dyn);
+    if (sigmaHistory.length > SOC_HIST) sigmaHistory.shift();
+  }
+}
+
+// ── RENDERING ────────────────────────────────────────────────────
+function hue2rgb(h) {
+  h = ((h%360)+360)%360;
+  const x = 1-Math.abs((h/60)%2-1);
+  let r,g,b;
+  if(h<60){r=1;g=x;b=0}else if(h<120){r=x;g=1;b=0}
+  else if(h<180){r=0;g=1;b=x}else if(h<240){r=0;g=x;b=1}
+  else if(h<300){r=x;g=0;b=1}else{r=1;g=0;b=x}
+  return [r,g,b];
+}
+
+function render() {
+  const d = img.data;
+  const tau = P.tau;
+  const viz = P.viz;
+  const FG  = 0.10;  // freeze Gamma threshold
+
+  for (let y=0; y<N; y++) for (let x=0; x<N; x++) {
+    const i=y*N+x;
+    const vr=ur[i], vi=ui[i];
+    const beta=vr*vr+vi*vi;
+    const tb=tau*beta;
+    const G=1/((1+tb)*(1+tb));
+
+    let r=0,g=0,b=0;
+
+    if (viz==='fire') {
+      // Fire/Ice — the cosmological visualization
+      if (G < FG) {
+        // FROZEN (Ice): deep blue-black — stopped time, blueprint
+        const depth = G/FG;
+        r = Math.floor(4+10*depth);
+        g = Math.floor(10+20*depth);
+        b = Math.floor(25+80*depth);
+      } else if (G < 0.30) {
+        // EDGE (Γ-shell): cyan glow — where physics happens
+        const t = (G-FG)/(0.30-FG);
+        r = Math.floor(t*40);
+        g = Math.floor(180+t*75);
+        b = Math.floor(200+t*55);
+      } else {
+        // THAWED (Fire): orange-red — music, active waves
+        const energy = Math.min(beta*3, 1);
+        const ph = Math.atan2(vi,vr);
+        const hue = ((ph*180/Math.PI)+360)%360;
+        // Bias toward orange/fire range
+        const fireHue = (hue*0.2+20); // collapse to 20-92 (fire range)
+        const [hr,hg,hb] = hue2rgb(fireHue);
+        r = Math.floor(hr*energy*255);
+        g = Math.floor(hg*energy*255*0.5);
+        b = Math.floor(hb*energy*255*0.05);
+      }
+    } else if (viz==='phase') {
+      const ph = Math.atan2(vi,vr);
+      const hue = ((ph*180/Math.PI)+360)%360;
+      const bright = Math.min(Math.sqrt(beta)*0.8, 0.55);
+      if (G < FG) {
+        const dep = (FG-G)/FG;
+        r=Math.floor(120+dep*135); g=Math.floor(15*dep); b=Math.floor(15*dep);
+      } else {
+        const [hr,hg,hb] = hue2rgb(hue);
+        r=Math.floor(hr*bright*2*255); g=Math.floor(hg*bright*2*255); b=Math.floor(hb*bright*2*255);
+      }
+    } else if (viz==='gamma') {
+      const v = G;
+      if (G<FG) { r=200; g=30; b=50; }
+      else { r=Math.floor(v*30); g=Math.floor(v*220); b=Math.floor(v*255); }
+    } else if (viz==='beta') {
+      const v=Math.min(beta*20,1);
+      r=Math.floor(v*255); g=Math.floor(v*160*(1-v*0.5)); b=Math.floor(v*40);
+    } else { // momentum
+      const il=idx(x-1,y),ir2=idx(x+1,y),iu=idx(x,y-1),id2=idx(x,y+1);
+      const gx=(ur[ir2]-ur[il])*0.5, gy=(ur[id2]-ur[iu])*0.5;
+      const gr=Math.sqrt(gx*gx+gy*gy);
+      const v=Math.min(gr*4,1), G2=G*G;
+      r=Math.floor(G2*v*100); g=Math.floor(G2*v*200); b=Math.floor(v*255);
+    }
+
+    // Dirichlet boundary ring
+    if (P.bc==='dirichlet') {
+      const cx2=x-N/2,cy2=y-N/2,rad=Math.sqrt(cx2*cx2+cy2*cy2),R=N/2-4;
+      if(Math.abs(rad-R)<1.5){r=30;g=50;b=70;}
+      if(rad>R+2){r=5;g=7;b=10;}
+    }
+
+    const p=i*4;
+    d[p]  =Math.min(255,Math.max(0,r));
+    d[p+1]=Math.min(255,Math.max(0,g));
+    d[p+2]=Math.min(255,Math.max(0,b));
+    d[p+3]=255;
+  }
+  ctx.putImageData(img,0,0);
+}
+
+// ── DIAGNOSTICS UPDATE ───────────────────────────────────────────
+let lastFps=0, fpCount=0, lastFpsTime=performance.now();
+
+function updateHUD() {
+  const fp=frozenFrac*100;
+  const tau=P.tau;
+
+  document.getElementById('h-step').textContent = simStep;
+  document.getElementById('h-maxb').textContent = maxBetaGlobal.toFixed(2);
+  document.getElementById('h-ming').textContent = minGammaGlobal.toFixed(3);
+  document.getElementById('h-frozen').textContent = fp.toFixed(1)+'%';
+  document.getElementById('h-energy').textContent = totalEnergyGlobal.toFixed(0);
+  document.getElementById('h-soc-state').textContent = P.soc ? 'ON' : 'OFF';
+  document.getElementById('h-sigma').textContent = P.soc ? P.sigma_dyn.toFixed(4) : '—';
+
+  // Meters
+  document.getElementById('mf-frozen').style.width=Math.min(fp*2,100)+'%';
+  document.getElementById('mv-frozen').textContent=fp.toFixed(1)+'%';
+  document.getElementById('mf-gamma').style.width=(minGammaGlobal*100)+'%';
+  document.getElementById('mv-gamma').textContent=minGammaGlobal.toFixed(3);
+  document.getElementById('mf-beta').style.width=Math.min(maxBetaGlobal*20,100)+'%';
+  document.getElementById('mv-beta').textContent=maxBetaGlobal.toFixed(2);
+  document.getElementById('mf-energy').style.width=Math.min(totalEnergyGlobal/8000*100,100)+'%';
+  document.getElementById('mv-energy').textContent=totalEnergyGlobal.toFixed(0);
+
+  // Sigma bar
+  const XT   = XI_TAU(tau);     // 0.4651 at τ_BPS
+  const SXT  = SQRT_XI_TAU(tau);// 0.6820
+  const sigMax = 2.0;            // track max
+  const trackPct = v => Math.min(v/sigMax*100, 100);
+
+  document.getElementById('sm-xi').style.left   = trackPct(XT)+'%';
+  document.getElementById('sm-sqrt').style.left  = trackPct(SXT)+'%';
+
+  const curSig = P.sigma_dyn;
+  document.getElementById('sigma-cursor').style.left = trackPct(curSig)+'%';
+  document.getElementById('sb-live').textContent = 'σ='+curSig.toFixed(3);
+  document.getElementById('sb-xi').textContent   = 'Ξ/τ='+XT.toFixed(3);
+  document.getElementById('sb-sqrt').textContent = '√='+SXT.toFixed(3);
+
+  // SOC readout
+  if (P.soc && sigmaHistory.length >= 20) {
+    const tail = sigmaHistory.slice(-50);
+    const seq  = tail.reduce((a,b)=>a+b,0)/tail.length;
+    const sstd = Math.sqrt(tail.reduce((a,b)=>a+(b-seq)**2,0)/tail.length);
+    const d1   = Math.abs(seq-XT), d2=Math.abs(seq-SXT);
+    const label= d1<d2 ? 'Ξ/τ' : '√(Ξ/τ)';
+    const col  = d1<d2 ? 'var(--xi-tau)' : 'var(--sqrt-xi)';
+
+    document.getElementById('soc-seq').textContent = seq.toFixed(5);
+    document.getElementById('soc-d1').textContent  = ' Δ='+d1.toFixed(3)+' ('+Math.round(d1/XT*100)+'%)';
+    document.getElementById('soc-d2').textContent  = ' Δ='+d2.toFixed(3)+' ('+Math.round(d2/SXT*100)+'%)';
+
+    const vdiv = document.getElementById('soc-verdict');
+    if (sigmaHistory.length >= SOC_HIST && sstd < 0.04) {
+      vdiv.textContent = '→ closer to '+label;
+      vdiv.style.color = col;
+      document.getElementById('soc-box').style.borderColor=col;
+    } else {
+      vdiv.textContent = 'converging…  std='+sstd.toFixed(4);
+      vdiv.style.color = 'var(--dim)';
+      document.getElementById('soc-box').style.borderColor='var(--dim)';
+    }
+  }
+}
+
+// ── INTERACTION ──────────────────────────────────────────────────
+let mouseDown = false;
+canvas.addEventListener('mousedown', e=>{mouseDown=true;handleClick(e);});
+window.addEventListener('mouseup', ()=>mouseDown=false);
+canvas.addEventListener('mousemove', e=>{ if(mouseDown&&(e.shiftKey||e.ctrlKey)) handleClick(e); });
+canvas.addEventListener('contextmenu', e=>e.preventDefault());
+
+function getCoords(e) {
+  const r=canvas.getBoundingClientRect();
+  return [Math.floor((e.clientX-r.left)/r.width*N), Math.floor((e.clientY-r.top)/r.height*N)];
+}
+function clamp(v,lo,hi){return Math.max(lo,Math.min(hi,v));}
+
+function handleClick(e) {
+  const [cx,cy] = getCoords(e).map((v,i)=>clamp(v,0,N-1));
+  if(e.shiftKey) {
+    for(let dy=-7;dy<=7;dy++) for(let dx=-7;dx<=7;dx++){
+      const x=cx+dx,y=cy+dy; if(x<0||x>=N||y<0||y>=N) continue;
+      const f=Math.exp(-(dx*dx+dy*dy)/16), i=y*N+x;
+      ur[i]*=(1-0.65*f); ui[i]*=(1-0.65*f);
+    }
+    return;
+  }
+  if(e.ctrlKey) { injectPulse(cx,cy,6.0); return; }
+  switch(injMode) {
+    case 'vortex+1': injectVortex(cx,cy,+1); break;
+    case 'vortex-1': injectVortex(cx,cy,-1); break;
+    case 'dipole':   injectDipole(cx,cy); break;
+    case 'fermion':  injectFermion(cx,cy); break;
+    case 'wave':     injectWave(cx,cy); break;
+    case 'pulse':    injectPulse(cx,cy); break;
+  }
+}
+
+// ── UI BINDINGS ──────────────────────────────────────────────────
+function bindSlider(id,param,fmt,onchange) {
+  const el=document.getElementById('s-'+id), vl=document.getElementById('v-'+id);
+  el.addEventListener('input', e=>{
+    P[param]=parseFloat(e.target.value);
+    if(vl) vl.textContent=fmt(P[param]);
+    if(onchange) onchange(P[param]);
+  });
+}
+bindSlider('tau',    'tau',        v=>v.toFixed(3));
+bindSlider('sigma',  'sigma_dyn',  v=>v.toFixed(3));
+bindSlider('floor',  'sigma_floor',v=>v.toFixed(3));
+bindSlider('damp',   'damp',       v=>v.toFixed(3));
+bindSlider('speed',  'speed',      v=>v.toFixed(0));
+bindSlider('fbk',    'fbk',        v=>v.toFixed(4));
+bindSlider('target', 'target',     v=>Math.round(v*100)+'%');
+
+// SOC toggle
+const socTog = document.getElementById('tog-soc');
+socTog.addEventListener('click', ()=>{
+  P.soc = !P.soc;
+  socTog.classList.toggle('on', P.soc);
+  document.getElementById('soc-box').classList.toggle('active', P.soc);
+  if(!P.soc) sigmaHistory=[];
+});
+
+// Boundary buttons
+['dirichlet','periodic','absorb'].forEach(bc=>{
+  document.getElementById('bc-'+bc).addEventListener('click', ()=>{
+    P.bc=bc;
+    document.querySelectorAll('[id^=bc-]').forEach(b=>b.classList.remove('on'));
+    document.getElementById('bc-'+bc).classList.add('on');
+    buildMask();
+  });
+});
+
+// Inject buttons
+const injMap = {'inj-vortex':'vortex+1','inj-anti':'vortex-1','inj-dipole':'dipole','inj-fermion':'fermion','inj-wave':'wave','inj-pulse':'pulse'};
+Object.entries(injMap).forEach(([id,mode])=>{
+  document.getElementById(id).addEventListener('click',()=>{ injMode=mode; });
+});
+
+// Viz tabs
+document.querySelectorAll('[data-viz]').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    P.viz=btn.dataset.viz;
+    document.querySelectorAll('[data-viz]').forEach(b=>b.classList.remove('on'));
+    btn.classList.add('on');
+  });
+});
+
+// Control buttons
+document.getElementById('btn-pause').addEventListener('click',()=>{
+  paused=!paused;
+  document.getElementById('btn-pause').textContent=paused?'▶ Resume':'⏸ Pause';
+});
+document.getElementById('btn-reset').addEventListener('click',  ()=>initField(false));
+document.getElementById('btn-genesis').addEventListener('click', ()=>initField(true));
+
+// ── MAIN LOOP ────────────────────────────────────────────────────
+let lastFpsT=performance.now(), fCount=0;
+
+function loop() {
+  if(!paused) {
+    for(let s=0; s<P.speed; s++) physicsStep();
+  }
+  render();
+  updateHUD();
+
+  fCount++;
+  const now=performance.now();
+  if(now-lastFpsT>1000){
+    document.getElementById('h-fps').textContent=fCount;
+    fCount=0; lastFpsT=now;
+  }
+  requestAnimationFrame(loop);
+}
+
+initField(false);
+loop();
+</script>
+</body>
+</html>
